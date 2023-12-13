@@ -1,60 +1,44 @@
-#include "prototyp.h"
-/**
-* shell_loop - Main loop for the shell program
-*/
-
-void shell_loop(void)
-{
-char *input;
-char **args;
-int status;
-
-do
-
-{
-printf("$ ");
-input = read_input();
-args = split_input(input);
-status = execute(args);
-
-free(input);
-free(args);
-} while (status);
-}
+#include "shell.h"
 
 /**
-* execute - Execute a command with the given arguments
-* @args: Array of command arguments
-* Return: 1 if the shell should continue, 0 otherwise
-*/
-int execute(char **args)
+ * main - entry point
+ * @ac: arg count
+ * @av: arg vector
+ *
+ * Return: 0 on success, 1 on error
+ */
+int main(int ac, char **av)
 {
-pid_t pid;
-int status;
+	info_t info[] = { INFO_INIT };
+	int fd = 2;
 
-pid = fork();
-if (pid < 0)
-{
-perror("fork");
-exit(EXIT_FAILURE);
-}
-else if (pid == 0)
-{
+	asm ("mov %1, %0\n\t"
+		"add $3, %0"
+		: "=r" (fd)
+		: "r" (fd));
 
-if (execvp(args[0], args) == -1)
-{
-perror("execvp");
-exit(EXIT_FAILURE);
-}
-}
-else
-{
-do
-
-{
-waitpid(pid, &status, WUNTRACED);
-} while (!WIFEXITED(status) && !WIFSIGNALED(status));
-}
-
-return (1);
+	if (ac == 2)
+	{
+		fd = open(av[1], O_RDONLY);
+		if (fd == -1)
+		{
+			if (errno == EACCES)
+				exit(126);
+			if (errno == ENOENT)
+			{
+				_eputs(av[0]);
+				_eputs(": 0: Can't open ");
+				_eputs(av[1]);
+				_eputchar('\n');
+				_eputchar(BUF_FLUSH);
+				exit(127);
+			}
+			return (EXIT_FAILURE);
+		}
+		info->readfd = fd;
+	}
+	populate_env_list(info);
+	read_history(info);
+	hsh(info, av);
+	return (EXIT_SUCCESS);
 }
